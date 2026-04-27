@@ -1,0 +1,527 @@
+@page "/"
+@inject ChatService ChatService
+@inject CorpusRefreshService RefreshService
+@inject AppQueryService QueryService
+@inject OllamaClient OllamaClient
+@inject IJSRuntime JS
+
+<PageTitle>Pathfinder SRD Companion</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.False" Class="home-shell">
+    <MudGrid Spacing="3">
+        <MudItem xs="12" md="4">
+            <MudStack Spacing="3">
+                <MudCard Class="panel-card">
+                    <MudCardContent>
+                        <MudText Typo="Typo.h5">Corpus</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">@(_summary?.CorpusName ?? "pf2e-srd")</MudText>
+
+                        <MudDivider Class="my-3" />
+
+                        <MudStack Spacing="1">
+                            <MudText Typo="Typo.body2"><strong>Source:</strong> @_summary?.RepositoryUrl</MudText>
+                            <MudText Typo="Typo.body2"><strong>Branch:</strong> @_summary?.Branch</MudText>
+                            <MudText Typo="Typo.body2"><strong>Commit:</strong> @ShortCommit(_summary?.CommitSha)</MudText>
+                            <MudText Typo="Typo.body2"><strong>Files:</strong> @_summary?.FileCount</MudText>
+                            <MudText Typo="Typo.body2"><strong>Chunks:</strong> @_summary?.ChunkCount</MudText>
+                            <MudText Typo="Typo.body2"><strong>Updated:</strong> @FormatUtc(_summary?.UpdatedUtc)</MudText>
+                        </MudStack>
+                    </MudCardContent>
+                </MudCard>
+
+                <MudCard Class="panel-card">
+                    <MudCardContent>
+                        <MudText Typo="Typo.h6">Models</MudText>
+                        <MudSelect T="string" Label="Chat model" Variant="Variant.Outlined" @bind-Value="_selectedModel" Disabled="_busy">
+                            @foreach (var model in _models)
+                            {
+                                <MudSelectItem Value="@model">@model</MudSelectItem>
+                            }
+                        </MudSelect>
+
+                        <MudNumericField T="int" Label="Top K" Variant="Variant.Outlined" @bind-Value="_topK" Min="1" Max="12" Class="mt-3" />
+
+                        <MudDivider Class="my-3" />
+
+                        <MudText Typo="Typo.h6">Import scope</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Selective import is the default. Turn on whole repo only when you need every markdown file.</MudText>
+
+                        <MudSelect T="string"
+                                   Label="Import preset"
+                                   Variant="Variant.Outlined"
+                                   Class="mt-2"
+                                   Value="_importPreset"
+                                   ValueChanged="OnImportPresetChanged"
+                                   Disabled="_refreshing">
+                            <MudSelectItem Value="@PresetCustom">Custom</MudSelectItem>
+                            <MudSelectItem Value="@PresetRulesOnly">Rules only</MudSelectItem>
+                            <MudSelectItem Value="@PresetCompendiumOnly">Compendium only</MudSelectItem>
+                            <MudSelectItem Value="@PresetRulesAndCompendium">Rules + compendium (no bestiary)</MudSelectItem>
+                            <MudSelectItem Value="@PresetSelectiveDefault">Default selective</MudSelectItem>
+                            <MudSelectItem Value="@PresetWholeRepo">Whole repo</MudSelectItem>
+                        </MudSelect>
+
+                        <MudCheckBox T="bool" @bind-Checked="_useWholeRepo" Label="Import the whole repository" Class="mt-2" Disabled="_refreshing" />
+
+                        @if (!_useWholeRepo)
+                        {
+                            <MudStack Spacing="1" Class="mt-2">
+                                <MudCheckBox T="bool" @bind-Checked="_includeCompendium" Label="Include compendium" Disabled="_refreshing" />
+                                <MudCheckBox T="bool" @bind-Checked="_includeRules" Label="Include rules" Disabled="_refreshing" />
+                                <MudCheckBox T="bool" @bind-Checked="_includeBestiary" Label="Include fantasy-bestiary enemies" Disabled="_refreshing" />
+                            </MudStack>
+                        }
+
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Disabled="_refreshing" OnClick="RefreshCorpusAsync" Class="mt-4">
+                            @(_refreshing ? "Refreshing..." : "Refresh database")
+                        </MudButton>
+
+                        @if (_refreshProgress is not null)
+                        {
+                            <MudProgressLinear Value="@RefreshPercent" Class="mt-3" Color="Color.Success" />
+                            <MudText Typo="Typo.caption" Class="mt-2">@_refreshProgress.Stage · @_refreshProgress.Message</MudText>
+                        }
+
+                        @if (!string.IsNullOrWhiteSpace(_refreshError))
+                        {
+                            <MudAlert Severity="Severity.Error" Class="mt-3">@_refreshError</MudAlert>
+                        }
+                    </MudCardContent>
+                </MudCard>
+
+                <MudCard Class="panel-card">
+                    <MudCardContent>
+                        <MudText Typo="Typo.h6">Recent stats</MudText>
+                        <MudText Typo="Typo.body2">History entries: @_history.Count</MudText>
+                        <MudText Typo="Typo.body2">Pinned entries: @_pins.Count</MudText>
+                        <MudText Typo="Typo.caption" Class="mt-2">The app keeps history and pins local to this database.</MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudStack>
+        </MudItem>
+
+        <MudItem xs="12" md="8">
+            <MudTabs Rounded="true" Elevation="1" Class="chat-tabs">
+                <MudTabPanel Text="Chat">
+                    <MudStack Spacing="3">
+                        <MudPaper Class="chat-pane" Elevation="0">
+                            <MudStack Spacing="2">
+                                @foreach (var turn in _turns)
+                                {
+                                    <MudPaper Class="@GetTurnClass(turn)" Elevation="0">
+                                        <MudStack Spacing="1">
+                                            <MudText Typo="Typo.caption" Class="@($"turn-role {(turn.Role == "user" ? "user" : "assistant")}")">
+                                                @(turn.Role == "user" ? "You" : "The Dungeon Master")
+                                            </MudText>
+                                            <MudText Style="white-space: pre-wrap;">@turn.Text</MudText>
+
+                                            @if (turn.Role == "assistant" && turn.Citations.Count > 0)
+                                            {
+                                                <MudExpansionPanels>
+                                                    <MudExpansionPanel Text="@($"Sources ({turn.Citations.Count})")">
+                                                        <MudStack Spacing="2">
+                                                            @foreach (var citation in turn.Citations)
+                                                            {
+                                                                <MudPaper Class="citation-card" Elevation="0">
+                                                                    <MudStack Spacing="1">
+                                                                        <MudText Typo="Typo.subtitle2">#@citation.Rank · @citation.SourceTitle</MudText>
+                                                                        <MudText Typo="Typo.caption">@citation.SourcePath</MudText>
+                                                                        <MudText Typo="Typo.body2">Score @citation.Score</MudText>
+                                                                        <MudText Typo="Typo.body2" Class="citation-preview">@citation.Preview</MudText>
+                                                                        <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="() => ShowSourceAsync(citation)">View source</MudButton>
+                                                                    </MudStack>
+                                                                </MudPaper>
+                                                            }
+                                                        </MudStack>
+                                                    </MudExpansionPanel>
+                                                </MudExpansionPanels>
+                                            }
+
+                                            @if (turn.Role == "assistant" && turn.RecordId is not null)
+                                            {
+                                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                                    <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" OnClick="() => PinTurnAsync(turn)">Pin</MudButton>
+                                                    @if (turn.IsStreaming)
+                                                    {
+                                                        <MudText Typo="Typo.caption" Class="turn-role streaming">Streaming</MudText>
+                                                    }
+                                                </MudStack>
+                                            }
+                                        </MudStack>
+                                    </MudPaper>
+                                }
+                            </MudStack>
+                        </MudPaper>
+
+                        @if (_sourcePreview is not null)
+                        {
+                            <MudPaper Class="source-preview-panel" Elevation="0">
+                                <MudStack Spacing="1">
+                                    <MudText Typo="Typo.h6">@_sourcePreview.SourceTitle</MudText>
+                                    <MudText Typo="Typo.caption">@_sourcePreview.SourcePath · chunk @_sourcePreview.ChunkIndex</MudText>
+                                    <MudText Style="white-space: pre-wrap;">@_sourcePreview.Text</MudText>
+                                </MudStack>
+                            </MudPaper>
+                        }
+
+                        <MudPaper Class="composer-panel" Elevation="1">
+                            <MudStack Spacing="2">
+                                <MudTextField T="string"
+                                              Label="Ask a rules question"
+                                              Variant="Variant.Outlined"
+                                              Lines="4"
+                                              Disabled="_busy"
+                                              @bind-Value="_question" />
+
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.FlexEnd" Spacing="2">
+                                    <MudButton Variant="Variant.Filled" Color="Color.Secondary" Disabled="_busy || string.IsNullOrWhiteSpace(_question)" OnClick="SendQuestionAsync">
+                                        @(_busy ? "Thinking..." : "Send")
+                                    </MudButton>
+                                </MudStack>
+                            </MudStack>
+                        </MudPaper>
+
+                        @if (!string.IsNullOrWhiteSpace(_chatError))
+                        {
+                            <MudAlert Severity="Severity.Error">@_chatError</MudAlert>
+                        }
+                    </MudStack>
+                </MudTabPanel>
+
+                <MudTabPanel Text="History">
+                    <MudTable Items="_history" Dense="true" Hover="true" Bordered="true" Striped="true">
+                        <HeaderContent>
+                            <MudTh>When</MudTh>
+                            <MudTh>Topic</MudTh>
+                            <MudTh>Question</MudTh>
+                            <MudTh>Actions</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@FormatUtc(context.CreatedUtc)</MudTd>
+                            <MudTd>@context.Topic</MudTd>
+                            <MudTd>@context.Question</MudTd>
+                            <MudTd>
+                                <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="() => PinHistoryAsync(context)">Pin</MudButton>
+                            </MudTd>
+                        </RowTemplate>
+                        <ChildRowContent>
+                            <MudTd colspan="4">
+                                <MudStack Spacing="2">
+                                    <MudText Style="white-space: pre-wrap;">@context.Answer</MudText>
+                                    <MudText Typo="Typo.caption">Model: @context.Model</MudText>
+                                </MudStack>
+                            </MudTd>
+                        </ChildRowContent>
+                    </MudTable>
+                </MudTabPanel>
+
+                <MudTabPanel Text="Pins">
+                    <MudTable Items="_pins" Dense="true" Hover="true" Bordered="true" Striped="true">
+                        <HeaderContent>
+                            <MudTh>When</MudTh>
+                            <MudTh>Topic</MudTh>
+                            <MudTh>Note</MudTh>
+                            <MudTh>Actions</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@FormatUtc(context.CreatedUtc)</MudTd>
+                            <MudTd>@context.Topic</MudTd>
+                            <MudTd>@context.Note</MudTd>
+                            <MudTd>
+                                <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="() => LoadPinnedSourceAsync(context)">View source</MudButton>
+                            </MudTd>
+                        </RowTemplate>
+                        <ChildRowContent>
+                            <MudTd colspan="4">
+                                <MudText Style="white-space: pre-wrap;">@context.Answer</MudText>
+                            </MudTd>
+                        </ChildRowContent>
+                    </MudTable>
+                </MudTabPanel>
+            </MudTabs>
+        </MudItem>
+    </MudGrid>
+</MudContainer>
+
+@code {
+    private readonly List<ChatTurn> _turns = [];
+    private readonly List<HistoryItemDto> _history = [];
+    private readonly List<PinDto> _pins = [];
+    private readonly List<string> _models = [];
+    private const string PresetCustom = "Custom";
+    private const string PresetRulesOnly = "Rules only";
+    private const string PresetCompendiumOnly = "Compendium only";
+    private const string PresetRulesAndCompendium = "Rules + compendium";
+    private const string PresetSelectiveDefault = "Default selective";
+    private const string PresetWholeRepo = "Whole repo";
+
+    private string _importPreset = PresetSelectiveDefault;
+    private string _selectedModel = string.Empty;
+    private string _question = string.Empty;
+    private int _topK = 8;
+    private bool _useWholeRepo;
+    private bool _includeCompendium = true;
+    private bool _includeRules = true;
+    private bool _includeBestiary = true;
+    private bool _busy;
+    private bool _refreshing;
+    private string? _chatError;
+    private string? _refreshError;
+    private RefreshProgressDto? _refreshProgress;
+    private CorpusSummaryDto? _summary;
+    private SourceChunkDto? _sourcePreview;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAllAsync();
+    }
+
+    private async Task LoadAllAsync()
+    {
+        _summary = await QueryService.GetSummaryAsync(null, CancellationToken.None);
+        _models.Clear();
+        var models = await OllamaClient.GetModelsAsync(CancellationToken.None);
+        _models.AddRange(models);
+        if (_models.Count > 0)
+        {
+            _selectedModel = _models.Contains(_summary.ChatModel) ? _summary.ChatModel : _models[0];
+        }
+        await LoadHistoryAsync();
+        await LoadPinsAsync();
+    }
+
+    private async Task LoadHistoryAsync()
+    {
+        _history.Clear();
+        _history.AddRange(await QueryService.GetHistoryAsync(null, 50, CancellationToken.None));
+    }
+
+    private async Task LoadPinsAsync()
+    {
+        _pins.Clear();
+        _pins.AddRange(await QueryService.GetPinsAsync(null, 50, CancellationToken.None));
+    }
+
+    private Task OnImportPresetChanged(string value)
+    {
+        _importPreset = value;
+
+        switch (value)
+        {
+            case PresetRulesOnly:
+                _useWholeRepo = false;
+                _includeCompendium = false;
+                _includeRules = true;
+                _includeBestiary = false;
+                break;
+            case PresetCompendiumOnly:
+                _useWholeRepo = false;
+                _includeCompendium = true;
+                _includeRules = false;
+                _includeBestiary = false;
+                break;
+            case PresetRulesAndCompendium:
+                _useWholeRepo = false;
+                _includeCompendium = true;
+                _includeRules = true;
+                _includeBestiary = false;
+                break;
+            case PresetWholeRepo:
+                _useWholeRepo = true;
+                _includeCompendium = true;
+                _includeRules = true;
+                _includeBestiary = true;
+                break;
+            case PresetSelectiveDefault:
+                _useWholeRepo = false;
+                _includeCompendium = true;
+                _includeRules = true;
+                _includeBestiary = true;
+                break;
+        }
+
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private async Task RefreshCorpusAsync()
+    {
+        _refreshError = null;
+        _refreshing = true;
+        _refreshProgress = new RefreshProgressDto("starting", "Preparing refresh", 0, 0, 0, 0);
+        try
+        {
+            var progress = new Progress<RefreshProgressDto>(value =>
+            {
+                _refreshProgress = value;
+                _ = InvokeAsync(StateHasChanged);
+            });
+
+            var request = BuildRefreshRequest();
+            if (request is null)
+            {
+                _refreshError = "Select at least one import root or switch to whole-repo import.";
+                return;
+            }
+
+            await RefreshService.RefreshAsync(request, CancellationToken.None, progress);
+            await LoadAllAsync();
+        }
+        catch (Exception ex)
+        {
+            _refreshError = ex.Message;
+        }
+        finally
+        {
+            _refreshing = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SendQuestionAsync()
+    {
+        if (_busy)
+        {
+            return;
+        }
+
+        var question = _question.Trim();
+        if (string.IsNullOrWhiteSpace(question))
+        {
+            return;
+        }
+
+        _busy = true;
+        _chatError = null;
+        _sourcePreview = null;
+        _question = string.Empty;
+
+        var request = new ChatRequestDto(question, _topK, _selectedModel, _summary?.CorpusName);
+        var preparation = await ChatService.PrepareAsync(request, CancellationToken.None);
+
+        var userTurn = new ChatTurn("user", question);
+        var assistantTurn = new ChatTurn("assistant", string.Empty)
+        {
+            Citations = preparation.Citations.ToList(),
+            IsStreaming = true
+        };
+
+        _turns.Add(userTurn);
+        _turns.Add(assistantTurn);
+        StateHasChanged();
+
+        try
+        {
+            await foreach (var token in ChatService.StreamAnswerAsync(preparation, request.Model, CancellationToken.None))
+            {
+                assistantTurn.Text += token;
+                await InvokeAsync(StateHasChanged);
+            }
+
+            var response = await ChatService.FinalizeAsync(request, preparation, assistantTurn.Text, CancellationToken.None);
+            assistantTurn.RecordId = response.RecordId;
+            assistantTurn.Citations = response.Citations.ToList();
+        }
+        catch (Exception ex)
+        {
+            _chatError = ex.Message;
+            assistantTurn.Text = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            assistantTurn.IsStreaming = false;
+            await LoadHistoryAsync();
+            StateHasChanged();
+        }
+    }
+
+    private async Task PinTurnAsync(ChatTurn turn)
+    {
+        if (turn.RecordId is null)
+        {
+            return;
+        }
+
+        var note = await PromptForNoteAsync("Optional pin note");
+        var pin = await QueryService.PinAsync(null, new PinRequestDto(turn.RecordId.Value, note), CancellationToken.None);
+        _pins.Insert(0, pin);
+    }
+
+    private async Task PinHistoryAsync(HistoryItemDto item)
+    {
+        var note = await PromptForNoteAsync("Optional pin note");
+        var pin = await QueryService.PinAsync(null, new PinRequestDto(item.RecordId, note), CancellationToken.None);
+        _pins.Insert(0, pin);
+    }
+
+    private async Task LoadPinnedSourceAsync(PinDto pin)
+    {
+        if (pin.Citations.Count == 0)
+        {
+            return;
+        }
+
+        _sourcePreview = await QueryService.GetChunkAsync(pin.CorpusName, pin.Citations[0].ChunkId, CancellationToken.None);
+    }
+
+    private async Task ShowSourceAsync(CitationDto citation)
+    {
+        var corpusName = _summary?.CorpusName ?? "pf2e-srd";
+        _sourcePreview = await QueryService.GetChunkAsync(corpusName, citation.ChunkId, CancellationToken.None);
+    }
+
+    private async Task<string?> PromptForNoteAsync(string prompt)
+    {
+        return await JS.InvokeAsync<string?>("prompt", prompt);
+    }
+
+    private CorpusRefreshRequestDto? BuildRefreshRequest()
+    {
+        if (_useWholeRepo)
+        {
+            return new CorpusRefreshRequestDto(true);
+        }
+
+        var includeRoots = new List<string>();
+        if (_includeCompendium)
+        {
+            includeRoots.Add("compendium");
+        }
+
+        if (_includeRules)
+        {
+            includeRoots.Add("rules");
+        }
+
+        if (_includeBestiary)
+        {
+            includeRoots.Add("fantasy-bestiary");
+        }
+
+        if (includeRoots.Count == 0)
+        {
+            return null;
+        }
+
+        return new CorpusRefreshRequestDto(false, includeRoots, []);
+    }
+
+    private static string GetTurnClass(ChatTurn turn) => turn.Role == "user" ? "chat-turn user" : "chat-turn assistant";
+
+    private static string ShortCommit(string? commitSha) => string.IsNullOrWhiteSpace(commitSha) ? "n/a" : commitSha[..Math.Min(commitSha.Length, 12)];
+
+    private static string FormatUtc(DateTimeOffset? value) => value is null || value.Value == DateTimeOffset.MinValue ? "n/a" : value.Value.ToUniversalTime().ToString("yyyy-MM-dd HH:mm 'UTC'", CultureInfo.InvariantCulture);
+
+    private double RefreshPercent
+        => _refreshProgress is null || _refreshProgress.TotalChunks == 0
+            ? 0
+            : Math.Clamp((_refreshProgress.ProcessedChunks * 100d) / _refreshProgress.TotalChunks, 0, 100);
+
+    private sealed class ChatTurn(string role, string text)
+    {
+        public string Role { get; } = role;
+        public string Text { get; set; } = text;
+        public Guid? RecordId { get; set; }
+        public bool IsStreaming { get; set; }
+        public List<CitationDto> Citations { get; set; } = [];
+    }
+}

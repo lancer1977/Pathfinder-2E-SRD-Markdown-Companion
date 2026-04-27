@@ -1,0 +1,14 @@
+bin/
+obj/
+.vs/
+artifacts/
+data/
+.codex/
+*.user
+*.suo
+*.cache
+*.db
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+.env

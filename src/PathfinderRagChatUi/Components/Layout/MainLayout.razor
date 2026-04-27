@@ -1,0 +1,45 @@
+﻿@inherits LayoutComponentBase
+
+<MudThemeProvider Theme="@_theme" IsDarkMode="true" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="1" Dense="true" Color="Color.Primary" Class="app-shell-bar">
+        <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Class="me-2" />
+        <MudText Typo="Typo.h6">Pathfinder SRD Companion</MudText>
+        <MudSpacer />
+        <MudText Typo="Typo.caption" Class="app-shell-pill">MudBlazor</MudText>
+    </MudAppBar>
+
+    <MudMainContent Class="app-main-content">
+        @Body
+    </MudMainContent>
+</MudLayout>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+</div>
+
+@code {
+    private readonly MudTheme _theme = new()
+    {
+        PaletteDark = new PaletteDark
+        {
+            Primary = "#7BE0B9",
+            Secondary = "#F4B66F",
+            Background = "#071018",
+            Surface = "#101C26",
+            AppbarBackground = "#08131A",
+            DrawerBackground = "#08131A",
+            DrawerText = "#E5F2ED",
+            TextPrimary = "#E5F2ED",
+            TextSecondary = "#B4C4BF",
+            LinesDefault = "rgba(170, 205, 194, 0.14)",
+            LinesInputs = "rgba(170, 205, 194, 0.22)"
+        }
+    };
+}

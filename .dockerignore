@@ -1,0 +1,14 @@
+**/bin/
+**/obj/
+.git/
+.github/
+.codex/
+data/
+artifacts/
+*.user
+*.suo
+*.sqlite
+*.db
+*.sqlite-shm
+*.sqlite-wal
+
