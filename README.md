@@ -70,6 +70,8 @@ Useful commands:
 ./pub.sh main
 ```
 
+The publish helper also loads optional local secrets from `~/.config/secrets/ghcr.env` and `~/.config/secrets/polyhydra.env`.
+
 ## Docs
 
 - [Feature docs](docs/features/mudblazor-rag-chat-ui/README.md)
