@@ -22,7 +22,7 @@ Provide a self-hosted rules chat app that:
 - [x] Implement chat, citations, history, and pins
 - [x] Add deployment workflows and helper scripts
 - [x] Add unit tests and an opt-in live corpus test
-- [ ] Validate refresh against a live Ollama instance and the fresh GitHub corpus clone
+- [x] Validate refresh against a live Ollama instance and the fresh GitHub corpus clone (passed with `RUN_LIVE_CORPUS_TESTS=1 OLLAMA_URL=http://127.0.0.1:11434 dotnet test tests/PathfinderRagChatUi.Tests/PathfinderRagChatUi.Tests.csproj --filter FullyQualifiedName~Live_Companion_Repo_Rag_Path_Requires_OptIn -p:RestoreIgnoreFailedSources=true`)
 
 ## Planned Stack
 

@@ -38,7 +38,7 @@ The corpus refresh flow now also supports selective imports:
 - [x] Add deployment workflows
 - [x] Add selective corpus import controls
 - [x] Add preset import modes
-- [ ] Validate the full stack against live Ollama and a fresh repo clone
+- [x] Validate the full stack against live Ollama and a fresh repo clone (passed with `RUN_LIVE_CORPUS_TESTS=1 OLLAMA_URL=http://127.0.0.1:11434 dotnet test tests/PathfinderRagChatUi.Tests/PathfinderRagChatUi.Tests.csproj --filter FullyQualifiedName~Live_Companion_Repo_Rag_Path_Requires_OptIn -p:RestoreIgnoreFailedSources=true`)
 
 ## Assumptions
 

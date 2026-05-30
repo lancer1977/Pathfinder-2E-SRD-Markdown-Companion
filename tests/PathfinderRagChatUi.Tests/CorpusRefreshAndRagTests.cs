@@ -145,7 +145,8 @@ public sealed class CorpusRefreshAndRagTests
             throw new InvalidOperationException($"No Ollama models were returned from {ollamaUrl}.");
         }
 
-        var selectedModel = availableModels[0];
+        var selectedModel = availableModels.FirstOrDefault(model => !model.Contains("embed", StringComparison.OrdinalIgnoreCase))
+            ?? throw new InvalidOperationException($"No chat-capable Ollama model was returned from {ollamaUrl}. Models: {string.Join(", ", availableModels)}");
         var fakeGit = new GitRepositoryClient();
         var (provider, dbPath) = TestHelpers.BuildProvider(sourceRoot, realOllama, fakeGit,
             repositoryUrl: "https://github.com/Obsidian-TTRPG-Community/Pathfinder-2E-SRD-Markdown",
