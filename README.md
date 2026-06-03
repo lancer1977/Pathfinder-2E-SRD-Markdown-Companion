@@ -2,6 +2,15 @@
 
 MudBlazor-based C# replacement for the original `rpg-chat-ui` prototype.
 
+## Tags
+
+- rpg
+- pathfinder-2-e-srd-markdown-companion
+- dotnet
+- tabletop
+- pathfinder
+- docker
+
 ## Goal
 
 Provide a self-hosted rules chat app that:
