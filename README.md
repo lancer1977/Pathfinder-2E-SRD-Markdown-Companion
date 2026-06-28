@@ -85,5 +85,5 @@ The publish helper also loads optional local secrets from `~/.config/secrets/ghc
 
 - [Docs Index](./docs/README.md)
 - [Feature docs](docs/features/mudblazor-rag-chat-ui/README.md)
-- [Roadmap docs](./docs/roadmaps/README.md)
+- [Portfolio roadmap](./docs/roadmaps/portfolio-roadmap.md)
 - [Roadmap](docs/roadmaps/csharp-mudblazor-port-and-deployment/README.md)
