@@ -12,6 +12,8 @@ data/
 *.sqlite-shm
 *.sqlite-wal
 .env
+.devstudio/runtime/
+.devstudio/work/
 
 # Hermes standard local noise
 

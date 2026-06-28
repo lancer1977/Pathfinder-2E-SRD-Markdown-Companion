@@ -1,12 +1,21 @@
-name: change-me
-repo_root: change-me
+name: Pathfinder-2E-SRD-Markdown-Companion
+repo_root: .
 
-languages: []
-frameworks: []
+languages:
+  - csharp
+  - razor
+  - markdown
+
+frameworks:
+  - dotnet
+  - blazor
+  - mudblazor
 
 ci:
-  build: []
-  test: []
+  build:
+    - dotnet build PathfinderRagChatUi.sln
+  test:
+    - dotnet test PathfinderRagChatUi.sln
 
 devstudio:
   runtime_model: three-agent
