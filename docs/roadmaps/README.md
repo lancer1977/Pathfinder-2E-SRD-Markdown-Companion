@@ -1,7 +1,6 @@
 # Pathfinder 2E SRD Markdown Companion Roadmaps
 
-Phased planning for the companion app lives here.
+This local planning file has been migrated. GitHub Issues are the canonical tracker.
 
-## Active Roadmaps
-
-- [C# MudBlazor port and deployment](./csharp-mudblazor-port-and-deployment/README.md)
+Canonical GitHub issue: https://github.com/lancer1977/Pathfinder-2E-SRD-Markdown-Companion/issues/6
+Original source kind: roadmap
